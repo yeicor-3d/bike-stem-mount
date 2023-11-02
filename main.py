@@ -111,6 +111,7 @@ if os.getenv('cq_draft'):
     drafts.add(
         draft_z.extension_line([(stem_range[1], -stem_rect[1] / 2, 0), (stem_range[1], stem_rect[1] / 2, 0)],
                                draft_dist, "stem_rect[1]"))
+    # noinspection PyTypeChecker
     drafts.add(
         draft_z.extension_line(
             obj.faces(">X").edges("not |Y").edges("<<Z[1]").val(),
