@@ -41,7 +41,7 @@ with BuildPart() as obj:
         Circle(radius=stem_circle_flat_radius, mode=Mode.SUBTRACT)
     extrude(amount=wall)
     with BuildSketch(Plane.XY.move(Location((0, 0, stem_circle_max_height + wall)))):
-        Circle(radius=stem_circle_radius+wall)
+        Circle(radius=stem_rect[1]/2)
         Circle(radius=stem_circle_radius, mode=Mode.SUBTRACT)
         Circle(radius=stem_circle_flat_radius)
         Circle(radius=stem_circle_flat_radius-wall, mode=Mode.SUBTRACT)
@@ -53,11 +53,18 @@ with BuildPart() as obj:
     # Stem fitting
     stem_distance = stem_range[1] - stem_range[0]
     with BuildSketch(Plane.YZ.move(Location((stem_range[1], 0, 0)))):
-        Rectangle((stem_circle_radius + wall)*2-eps, wall, align=(Align.CENTER, Align.MIN))
+        Rectangle(stem_rect[1]-eps, stem_circle_max_height+wall, align=(Align.CENTER, Align.MIN))
     extrude(until=Until.PREVIOUS)
-    with BuildSketch(Plane.XY.move(Location((stem_circle_radius, 0, 0)))):
-        Rectangle(stem_range[1] - stem_circle_radius, stem_rect[0], align=(Align.MIN, Align.CENTER))
-    extrude(amount=wall)
+    corner_vertices = obj.faces().group_by(Axis.Z)[0].vertices().group_by(Axis.X)[-1]
+    with BuildSketch(*map(lambda v: Location(v.center() - Vector(0, wall/2 * (1 if v.center().Y > 0 else -1), 0)), corner_vertices)):
+        Rectangle(stem_distance, wall, align=(Align.MAX, Align.CENTER))
+    del corner_vertices
+    extrude(amount=-stem_rect[0])
+    tmp_fillet = obj.faces(Select.LAST).filter_by(Axis.Z).group_by(Axis.Z)[1].edges().filter_by(Axis.X).group_by(SortBy.LENGTH)[-1]
+    fillet(tmp_fillet, stem_fillet)
+    del tmp_fillet
+    tmp_fillet = obj.faces().group_by(Axis.Z)[-1].edges().filter_by(GeomType.LINE)
+    fillet(tmp_fillet, stem_circle_max_height + wall - 0.1 - eps)
 
 
 # ================== SHOWING/EXPORTING ==================
