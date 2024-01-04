@@ -9,6 +9,10 @@ with suppress(ImportError):  # Optional
 # %%
 # ================== MODELLING (ASSEMBLY) ==================
 
+with BuildPart() as assembly:
+    add(headset_screw_part)
+    add(stem_and_handle_bars_part)
+
 if 'ocp_vscode' in locals():
     with suppress(Exception):
         ocp_vscode.show_all()
@@ -20,7 +24,7 @@ if 'ocp_vscode' in locals():
 export = True
 try:
     if "show_object" in locals():
-        show_object(headset_screw_part, "bike-stem-mount")  # type: ignore
+        show_object(assembly, "bike-stem-mount")  # type: ignore
         export = False
     elif "ocp_vscode" in locals():
         ocp_vscode.reset_show()
@@ -31,6 +35,6 @@ except Exception as ex:
 
 if export:
     print("Exporting to STL")
-    headset_screw_part.part.export_stl("bike-stem-mount.stl")
+    assembly.part.export_stl("bike-stem-mount.stl")
 
 # %%

@@ -1,18 +1,21 @@
 # %%
 from contextlib import suppress
 from build123d import *
+from copy import copy
+import math
 try:
     from global_params import *
-    from headset_screw_part import headset_screw_part
+    from headset_screw_part import headset_screw_part, stem_circle_max_height, stem_circle_radius
 except ImportError:  # HACK...
     from parts.global_params import *
-    from parts.headset_screw_part import headset_screw_part
+    from parts.headset_screw_part import headset_screw_part, stem_circle_max_height, stem_circle_radius
 with suppress(ImportError):  # Optional
     import ocp_vscode
 
 # ================== PARAMETERS ==================
 
 # Measurements...
+stem_angle = 20  # Stem angle wrt the headset
 stem_rect = (35, 35)  # Stem "rectangle" (horizontal, vertical)
 # Where to connect to the stem from the center of the circle
 stem_range = (20, 45)
@@ -22,20 +25,43 @@ stem_clip = (stem_fillet, 2.0)
 
 # ================== MODELLING ==================
 
-conn_face = headset_screw_part.faces().group_by(Axis.X)[-1]
-conn_face_center = conn_face.face().center()
-conn_face_bb = conn_face.face().bounding_box()
+# Uglily recreate conn_face to support sweeping...
+conn_face = headset_screw_part.faces().group_by(Axis.X)[-1].face()
+conn_face_bb = conn_face.bounding_box()
 with BuildSketch() as sweep_obj:
-    # add(conn_face)
-    Rectangle(3, 10)
-    # with BuildLine() as sweep_obj_line:
-    #     Polyline(conn_face_bb.min, (conn_face_bb.min.X, conn_face_bb.max.Y, conn_face_bb.min.Z),
-    #              conn_face_bb.max, (conn_face_bb.min.X, conn_face_bb.min.Y, conn_face_bb.max.Z), close=True)
-    # make_face()
+    with BuildLine() as sweep_obj_line:
+        Polyline((conn_face_bb.min.Z, conn_face_bb.min.Y), (conn_face_bb.max.Z, conn_face_bb.min.Y),
+                 (conn_face_bb.max.Z, conn_face_bb.max.Y), (conn_face_bb.min.Z, conn_face_bb.max.Y), close=True)
+    make_face()
+
+    to_fillet = sweep_obj_line.vertices().group_by(Axis.X)[-1]
+    fillet(objects=to_fillet, radius=stem_circle_max_height-wall)
+    to_fillet = sweep_obj_line.vertices().group_by(Axis.X)[0]
+    fillet(objects=to_fillet, radius=wall)
+
+    # Validate exact sketch matches...
+    with BuildSketch() as match:
+        add(sweep_obj)
+        add(conn_face, mode=Mode.SUBTRACT)
+        assert len(match.vertices()
+                   ) == 0, "Rebuilt face sketch doesn't match original"
+        add(conn_face)
+        add(sweep_obj, mode=Mode.SUBTRACT)
+        assert len(match.vertices()
+                   ) == 0, "Rebuilt face sketch doesn't match original"
+    del match
+
+stem_dist = stem_range[1] - stem_range[0]
+stem_height = stem_dist * math.tan(math.radians(stem_angle))
+print(stem_height)
 with BuildLine() as sweep_path:
-    Line((conn_face_center.Z, 0, 0), (conn_face_center.Z, 0, 10))
+    Polyline((0, 0, stem_circle_radius),
+             (0, 0, stem_range[0]), (stem_height, 0, stem_range[1]))
 
 stem_and_handle_bars_part = sweep(sections=sweep_obj, path=sweep_path)
+conn_face_loc = copy(conn_face.center_location)
+stem_and_handle_bars_part = stem_and_handle_bars_part.moved(
+    Location(conn_face_loc.position - (0, 0, conn_face_bb.size.Z/2), (180, 90, 0)))
 
 
 if __name__ == "__main__":  # While developing this single part

@@ -63,11 +63,11 @@ with BuildPart() as headset_screw_part:
     # Final filleting
     to_fillet = headset_screw_part.faces().group_by(Axis.Z)[-1].edges()
     to_fillet -= to_fillet.group_by(Axis.X)[-1]
-    fillet(to_fillet, stem_circle_max_height)
+    fillet(to_fillet, stem_circle_max_height - wall)
     del to_fillet
     to_fillet = headset_screw_part.edges().group_by(
         Axis.Z)[0].group_by(SortBy.LENGTH)[-1]
-    fillet(to_fillet, wall - eps)
+    fillet(to_fillet, wall)
     del to_fillet
 
 if __name__ == "__main__":  # While developing this single part
