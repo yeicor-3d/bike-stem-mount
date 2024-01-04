@@ -49,8 +49,7 @@ with BuildPart() as headset_screw_part:
     # Final chamfering
     to_chamfer = headset_screw_part.edges().filter_by(GeomType.CIRCLE).group_by(
         SortBy.LENGTH)[1].sort_by(Axis.Z)[-1]
-    chamfer(to_chamfer, stem_circle_flat_radius - stem_screw_flat_radius,
-            stem_circle_max_height - eps)
+    chamfer(to_chamfer, stem_circle_max_height - eps)
     del to_chamfer
     to_chamfer = headset_screw_part.edges().filter_by(
         GeomType.CIRCLE).group_by(Axis.Z)[0]
@@ -73,5 +72,3 @@ with BuildPart() as headset_screw_part:
 
 if __name__ == "__main__":  # While developing this single part
     ocp_vscode.show_all()
-
-# %%
