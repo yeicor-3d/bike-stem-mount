@@ -1,6 +1,6 @@
 # Bike stem mount
 
-You can download the latest builds from the [workflow runs](https://yeicor-3d.github.io/bike-stem-mount/actions/workflows/main.yml).
+You can download the latest builds from the [workflow runs](https://github.com/yeicor-3d/bike-stem-mount/actions/workflows/main.yml).
 
 You can preview the model in an interactive demo by clicking the following render of the latest design:
 

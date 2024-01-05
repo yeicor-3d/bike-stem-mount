@@ -18,7 +18,7 @@ stem_angle = 20  # Stem angle wrt the headset
 stem_rect = (35, 35)  # Stem "rectangle" (horizontal, vertical)
 # Where to connect to the stem from the center of the circle
 stem_range = (20, 45)
-stem_fillet = 5.0  # Fillet radius of the stem (square -> circle)
+stem_fillet = 4.75  # Fillet radius of the stem (square -> circle)
 # How much to overlap the stem with our model for a stronger connection
 stem_clip = (stem_fillet, 2.0)
 
@@ -80,6 +80,8 @@ to_extrude = stem_part.faces().group_by(Axis.X)[-1]
 stem_part += extrude(to_extrude, amount=extrude_dir.length,
                      dir=extrude_dir.normalized())
 del to_extrude
+del extrude_dir
+del stem_dist
 to_fillet = stem_part.edges().filter_by(
     lambda e: abs((e@0 - e@1).X) < eps).group_by(Axis.X)[1]
 stem_part = fillet(to_fillet, 1.9)
@@ -90,8 +92,50 @@ stem_side_faces = stem_part.faces().filter_by(
     lambda f: abs(f.normal_at((0, 0)).Y) > 1-eps)
 assert len(stem_side_faces) == 2, "Expected 2 side faces"
 
-# to_fillet = edges().group_by(Axis.X)[-1]
-# fillet(to_fillet, wall)
+# Now add the stem connector (part 1)
+top_edges = stem_side_faces.edges().group_by(SortBy.LENGTH)[-1]
+for edge in top_edges:
+    is_far = (edge@0).Y > 0
+    with BuildPart() as side_extrusion:
+        with BuildSketch(Location(edge@0.5, (0, -stem_angle, 0))):
+            Rectangle((edge@1 - edge@0).length, wall,
+                      align=(Align.CENTER, Align.MAX if is_far else Align.MIN))
+        extrude(amount=-(stem_rect[1] + 2 * wall),
+                dir=Vector(-math.sin(math.radians(stem_angle)), 0, math.cos(math.radians(stem_angle))))
+    stem_part += side_extrusion.part
+    del side_extrusion
+del top_edges
+del edge
+
+# Now add the stem connector (part 2)
+with BuildPart() as bottom_extrusion:
+    bottom_close = stem_part.faces().group_by(
+        Axis.Z)[0].edges().group_by(Axis.Y)[0].edge()
+    with BuildSketch(Location(bottom_close@0.5, (90, 0, stem_angle))):
+        Rectangle((bottom_close@1 - bottom_close@0).length,
+                  wall, align=(Align.CENTER, Align.MIN))
+    extrude(amount=-(stem_rect[1] + 2 * wall))
+stem_part += bottom_extrusion.part
+del bottom_extrusion
+del bottom_close
+
+# Stem fillet
+to_fillet = stem_part.edges().filter_by(Plane.XZ)
+to_fillet = sum(to_fillet.group_by(SortBy.LENGTH)[-7:-5], ShapeList())
+to_fillet = to_fillet.group_by(Axis.Z)[-1]
+stem_part = fillet(to_fillet, 0.4)
+to_fillet = stem_part.edges().filter_by(Plane.XZ)
+to_fillet = sum(to_fillet.group_by(SortBy.LENGTH)[-11:-8], ShapeList())
+to_fillet -= to_fillet.group_by(Axis.Y)[0]
+to_fillet -= to_fillet.group_by(Axis.Y)[-1]
+to_fillet -= to_fillet.group_by(Axis.Y)[-1]
+assert len(
+    to_fillet) == 4, "Unexpected number of edges to fillet (weak filtering...)"
+stem_part = fillet(to_fillet, stem_fillet)
+to_fillet = stem_part.edges().group_by(Axis.Z)[3]
+assert len(to_fillet) == 2, "Unexpected number of edges to fillet"
+stem_part = fillet(to_fillet, stem_fillet)
+del to_fillet
 
 if __name__ == "__main__":  # While developing this single part
     ocp_vscode.show_all()
