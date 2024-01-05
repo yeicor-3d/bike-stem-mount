@@ -60,8 +60,9 @@ with BuildSketch(Plane.XY.offset(stem_range[0]-stem_circle_radius)) as sweep_obj
 with BuildLine() as sweep_path:
     Line((0, 0, 0), (0, 0, stem_range[0]-stem_circle_radius))
 
-stem_part = sweep(sections=[sweep_obj, sweep_obj_2.sketch],
+stem_part = sweep(sections=[sweep_obj, sweep_obj.sketch.moved(Location((0, 0, 1))), sweep_obj_2.sketch],
                   path=sweep_path, multisection=True)
+assert stem_part.is_valid(), "Sweep failed"
 conn_face_loc = copy(conn_face.center_location)
 stem_part = stem_part.moved(
     Location(conn_face_loc.position - (0, 0, conn_face_bb.size.Z/2), (180, 90, 0)))
@@ -81,7 +82,7 @@ stem_part += extrude(to_extrude, amount=extrude_dir.length,
 del to_extrude
 to_fillet = stem_part.edges().filter_by(
     lambda e: abs((e@0 - e@1).X) < eps).group_by(Axis.X)[1]
-stem_part = fillet(to_fillet, stem_range[0]-stem_circle_radius)
+stem_part = fillet(to_fillet, 1.9)
 del to_fillet
 
 # This export is required for handle_bars.py
