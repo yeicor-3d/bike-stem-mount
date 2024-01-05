@@ -1,7 +1,6 @@
 # %%
 from contextlib import suppress
 from build123d import *
-from copy import copy, deepcopy
 import math
 try:
     from global_params import *
@@ -14,23 +13,18 @@ with suppress(ImportError):  # Optional
 
 # ================== PARAMETERS ==================
 
-stem_angle = 20  # Stem angle wrt the headset
-stem_rect = (35, 35)  # Stem "rectangle" (horizontal, vertical)
-# Where to connect to the stem from the center of the circle
-stem_range = (20, 45)
-stem_fillet = 5.0  # Fillet radius of the stem (square -> circle)
-# How much to overlap the stem with our model for a stronger connection
-stem_clip = (stem_fillet, 2.0)
-
 handlebar_side_xy = (60, 20)  # (center, start)
 handlebar_size = (10, wall)  # (width, height)
+handlebar_rot = 5  # Rotation of the handlebar (degrees)
+handlebar_rad = 16  # Radius of the handlebar
 
 # ================== MODELLING ==================
 
 handlebar_side_loc = Location(
     (handlebar_side_xy[0], handlebar_side_xy[1], stem_height), (0, 90, 90))
 with BuildSketch(handlebar_side_loc) as handlebar_side:
-    Rectangle(handlebar_size[0], handlebar_size[1], align=Align.MIN)
+    Rectangle(handlebar_size[0], handlebar_size[1],
+              align=Align.MIN, rotation=-handlebar_rot)
 with BuildPart() as handlebar_side_conn:
     conn_base = sum(stem_part_core.faces().group_by(
         Axis.Y)[-3:], ShapeList())
@@ -56,7 +50,7 @@ with BuildPart() as handlebar_side_conn:
     with BuildLine() as handlebar_side_conn_path:
         Spline(face_loc.position,
                handlebar_side_loc.position,
-               tangents=[(0, 1, 0), (1, 0, 0)],
+               tangents=[(0, 1, 0), Vector(1, 0, -0.2).normalized()],
                tangent_scalars=[.5, 1])
     sweep(sections=[handlebar_side.sketch, face],
           path=handlebar_side_conn_path, multisection=True)
@@ -64,12 +58,23 @@ with BuildPart() as handlebar_side_conn:
     del face_loc
     del handlebar_side_conn_path
     del handlebar_side_loc
-    del handlebar_side
+
+save = handlebar_side_conn.faces().group_by(Axis.X)[-1].face().center_location
+with BuildPart() as handle_bar_core:
+    with BuildSketch(save):
+        Rectangle(handlebar_size[1], handlebar_size[0],
+                  rotation=-handlebar_rot)
+    revolve(axis=Axis(save.position - (0, 0, handlebar_rad +
+                                       handlebar_size[1]/2), (0, 1, 0)))
+    del save
+handlebar_side_conn.part += handle_bar_core.part
 
 # Join a mirrored version of the handlebar side
 with BuildPart() as handle_bars_part:
     add(handlebar_side_conn)
+
     add(mirror(objects=handlebar_side_conn.part))
+    del handlebar_side_conn
 
 if __name__ == "__main__":  # While developing this single part
     ocp_vscode.show_all()

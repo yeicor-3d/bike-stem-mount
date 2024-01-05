@@ -22,9 +22,6 @@ stem_fillet = 5.0  # Fillet radius of the stem (square -> circle)
 # How much to overlap the stem with our model for a stronger connection
 stem_clip = (stem_fillet, 2.0)
 
-handlebar_side_xy = (60, 20)  # (center, start)
-handlebar_size = (10, wall)  # (width, height)
-
 # ================== MODELLING ==================
 
 
@@ -80,8 +77,10 @@ del conn_face
 del conn_face_bb
 # Stem part core is required as is by handle_bars.py
 
-
-stem_part = stem_part_core
+with BuildPart() as stem_part:
+    add(deepcopy(stem_part_core))
+    to_fillet = edges().group_by(Axis.X)[-1]
+    fillet(to_fillet, wall)
 
 if __name__ == "__main__":  # While developing this single part
     ocp_vscode.show_all()
