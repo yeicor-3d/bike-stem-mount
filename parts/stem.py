@@ -5,10 +5,10 @@ from copy import copy, deepcopy
 import math
 try:
     from global_params import *
-    from headset_screw_part import headset_screw_part, stem_circle_max_height, stem_circle_radius
+    from headset_screw import headset_screw_part, stem_circle_max_height, stem_circle_radius
 except ImportError:  # HACK...
     from parts.global_params import *
-    from parts.headset_screw_part import headset_screw_part, stem_circle_max_height, stem_circle_radius
+    from parts.headset_screw import headset_screw_part, stem_circle_max_height, stem_circle_radius
 with suppress(ImportError):  # Optional
     import ocp_vscode
 
@@ -22,7 +22,7 @@ stem_fillet = 5.0  # Fillet radius of the stem (square -> circle)
 # How much to overlap the stem with our model for a stronger connection
 stem_clip = (stem_fillet, 2.0)
 
-handlebar_side_xy = (60, 30)  # (center, start)
+handlebar_side_xy = (60, 20)  # (center, start)
 handlebar_size = (10, wall)  # (width, height)
 
 # ================== MODELLING ==================
@@ -65,49 +65,23 @@ with BuildSketch() as sweep_obj:
 
 stem_dist = stem_range[1] - stem_range[0]
 stem_height = stem_dist * math.tan(math.radians(stem_angle))
-print(stem_height)
 with BuildLine() as sweep_path:
     Polyline((0, 0, stem_circle_radius),
              (0, 0, stem_range[0]), (stem_height, 0, stem_range[1]))
 
-stem_and_handle_bars_part = sweep(sections=sweep_obj, path=sweep_path)
+stem_part_core = sweep(sections=sweep_obj, path=sweep_path)
 conn_face_loc = copy(conn_face.center_location)
-stem_and_handle_bars_part = stem_and_handle_bars_part.moved(
+stem_part_core = stem_part_core.moved(
     Location(conn_face_loc.position - (0, 0, conn_face_bb.size.Z/2), (180, 90, 0)))
 del sweep_obj
 del sweep_path
 del conn_face_loc
 del conn_face
 del conn_face_bb
+# Stem part core is required as is by handle_bars.py
 
-handlebar_side_loc = Location(
-    (handlebar_side_xy[0], handlebar_side_xy[1], stem_height), (0, 90, 90))
-with BuildSketch(handlebar_side_loc) as handlebar_side_conn_2:
-    with BuildLine() as handlebar_side_conn_2_line:
-        Polyline(
-            (0, 0),
-            (handlebar_size[0], 0),
-            (handlebar_size[0], handlebar_size[1]),
-            (0, handlebar_size[1]),
-            close=True)
-    make_face()
 
-with BuildPart() as handlebar_side_conn:  # TODO: Add separately after exporting due to bugs?
-    conn_base_faces = sum(
-        stem_and_handle_bars_part.faces().group_by(Axis.Y)[-1:], ShapeList())
-    conn_compound = Compound.make_compound(conn_base_faces)
-    face_loc = Location(conn_base_faces.faces().filter_by(
-        Axis.Y).face().vertices().group_by(Axis.X)[0].group_by(Axis.Z)[0].vertex().center())
-    with BuildLine() as handlebar_side_conn_path:
-        Spline(face_loc.position + (20, 0, 2),
-               handlebar_side_loc.position + (0, 5, 0),
-               tangents=[(0, 1, 0), (1, 0, 0)],
-               tangent_scalars=[1, 1])
-    sweep(sections=[handlebar_side_conn_2.sketch, conn_compound],
-          path=handlebar_side_conn_path, multisection=True)
-
-# Can't even mirror this buggy object, more post-processing...
-# handlebar_side_conn_mirror = mirror(handlebar_side_conn)
+stem_part = stem_part_core
 
 if __name__ == "__main__":  # While developing this single part
     ocp_vscode.show_all()

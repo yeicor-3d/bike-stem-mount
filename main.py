@@ -1,6 +1,7 @@
 # %%
-from parts.headset_screw_part import headset_screw_part
-from parts.stem_and_handle_bars_part import stem_and_handle_bars_part
+from parts.headset_screw import headset_screw_part
+from parts.stem import stem_part
+from parts.handle_bars import handle_bars_part
 from contextlib import suppress
 from build123d import *
 with suppress(ImportError):  # Optional
@@ -11,7 +12,8 @@ with suppress(ImportError):  # Optional
 
 with BuildPart() as assembly:
     add(headset_screw_part)
-    add(stem_and_handle_bars_part)
+    add(stem_part)
+    add(handle_bars_part)
 
 if 'ocp_vscode' in locals():
     with suppress(Exception):
