@@ -2,6 +2,7 @@
 from parts.headset_screw import headset_screw_part
 from parts.stem import stem_part
 from parts.handle_bars import handle_bars_part
+from parts.global_params import *
 from contextlib import suppress
 from build123d import *
 with suppress(ImportError):  # Optional
