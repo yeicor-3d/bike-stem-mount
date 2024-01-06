@@ -34,9 +34,10 @@ with BuildPart() as handlebar_side_conn:
     with BuildLine() as handlebar_side_conn_path:
         Spline(face_loc.position,
                handlebar_side_loc.position,
-               tangents=[(0, 1, 0), Vector(1, 0, -0.1).normalized()],
+               tangents=[(0, 1, 0), Vector(1, 0, 0).normalized()],
                tangent_scalars=[.5, 1])
-    sweep(sections=[handlebar_side.sketch, face],
+    thin_factor = 3
+    sweep(sections=[handlebar_side.sketch, handlebar_side.sketch.moved(Location((-thin_factor, 0, 0))), face],
           path=handlebar_side_conn_path, multisection=True)
     del handlebar_side
     del face
