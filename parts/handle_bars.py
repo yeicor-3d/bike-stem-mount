@@ -1,7 +1,6 @@
 # %%
 from contextlib import suppress
 from build123d import *
-import math
 try:
     from global_params import *
     from stem import stem_height, stem_side_faces
