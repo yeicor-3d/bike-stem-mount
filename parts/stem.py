@@ -62,8 +62,12 @@ with BuildSketch(Plane.XY.offset(stem_range[0]-stem_circle_radius)) as sweep_obj
 with BuildLine() as sweep_path:
     Line((0, 0, 0), (0, 0, stem_range[0]-stem_circle_radius))
 
-stem_part = sweep(sections=[sweep_obj, sweep_obj.sketch.moved(Location((0, 0, 1))), sweep_obj_2.sketch],
-                  path=sweep_path, multisection=True)
+smoothing_offset = 0.5
+stem_part = sweep(sections=[
+    sweep_obj,
+    sweep_obj.sketch.moved(Location((0, 0, smoothing_offset))),
+    sweep_obj_2.sketch.moved(Location((0, 0, -smoothing_offset))),
+    sweep_obj_2.sketch], path=sweep_path, multisection=True)
 assert stem_part.is_valid(), "Sweep failed"
 conn_face_loc = copy(conn_face.center_location)
 stem_part = stem_part.moved(
@@ -78,23 +82,31 @@ del sweep_obj
 stem_dist = stem_range[1] - stem_range[0]
 stem_height = stem_dist * math.tan(math.radians(stem_angle))
 extrude_dir = Vector(stem_dist, 0, stem_height)
-to_extrude = stem_part.faces().group_by(Axis.X)[-1]
+face = (stem_part.faces() >> Axis.X).face()
+# NOTE: Backwards and unaligned due to eps (required non-coincident edge and axis)
+rev_axis = Axis(face.edges().group_by(Axis.Z)
+                [-1].edge().center()+(0, 0, eps), (0, 1, 0))
+rev_to_align = revolve(profiles=face, axis=rev_axis, revolution_arc=stem_angle)
+del face
+rev_to_align = rev_to_align.rotate(rev_axis, -stem_angle)
+del rev_axis
+stem_part += rev_to_align
+del rev_to_align
+assert len(stem_part.solids()) == 1, "Expected 1 solid"
+to_extrude = stem_part.faces().group_by(Axis.X)[-2]  # Why -1?
 stem_part += extrude(to_extrude, amount=extrude_dir.length,
                      dir=extrude_dir.normalized())
-del to_extrude
-del extrude_dir
+# del extrude_dir
 del stem_dist
-to_fillet = stem_part.edges().filter_by(
-    lambda e: abs((e@0 - e@1).X) < eps).group_by(Axis.X)[1]
-stem_part = fillet(to_fillet, 1.9)
-del to_fillet
 
 # This export is required for handle_bars.py
-stem_side_faces = stem_part.faces().filter_by(
-    lambda f: abs(f.normal_at((0, 0)).Y) > 1-eps)
+stem_side_faces = split(stem_part, bisect_by=Plane(to_extrude.face())).faces()
+del to_extrude
+stem_side_faces = stem_side_faces.group_by(Axis.Y)[0] + \
+    stem_side_faces.group_by(Axis.Y)[-1]
 assert len(stem_side_faces) == 2, "Expected 2 side faces"
 
-# Now add the stem connector (part 1)
+# Now add the stem connector (sides)
 top_edges = stem_side_faces.edges().group_by(SortBy.LENGTH)[-1]
 for edge in top_edges:
     is_far = (edge@0).Y > 0
@@ -109,7 +121,7 @@ for edge in top_edges:
 del top_edges
 del edge
 
-# Now add the stem connector (part 2)
+# Now add the stem connector (bottom)
 with BuildPart() as bottom_extrusion:
     bottom_close = stem_part.faces().group_by(
         Axis.Z)[0].edges().group_by(Axis.Y)[0].edge()
@@ -122,22 +134,19 @@ del bottom_extrusion
 del bottom_close
 
 # Stem fillet
-to_fillet = stem_part.edges().filter_by(Plane.XZ)
-to_fillet = sum(to_fillet.group_by(SortBy.LENGTH)[-7:-5], ShapeList())
-to_fillet = to_fillet.group_by(Axis.Z)[-1]
-stem_part = fillet(to_fillet, 0.4)
-to_fillet = stem_part.edges().filter_by(Plane.XZ)
-to_fillet = sum(to_fillet.group_by(SortBy.LENGTH)[-11:-8], ShapeList())
-to_fillet -= to_fillet.group_by(Axis.Y)[0]
-to_fillet -= to_fillet.group_by(Axis.Y)[-1]
-to_fillet -= to_fillet.group_by(Axis.Y)[-1]
+to_fillet = stem_part.edges().filter_by(Axis((0, 0, 0), extrude_dir))
+to_fillet -= to_fillet.group_by(Axis.Y)[0]  # Remove out
+to_fillet -= to_fillet.group_by(Axis.Y)[-1]  # Remove out
 assert len(
-    to_fillet) == 4, "Unexpected number of edges to fillet (weak filtering...)"
+    to_fillet) == 4, "Unexpected number of edges to fillet for stem (in-only)"
 stem_part = fillet(to_fillet, stem_fillet)
-to_fillet = stem_part.edges().group_by(Axis.Z)[3]
-assert len(to_fillet) == 2, "Unexpected number of edges to fillet"
+to_fillet = stem_part.edges().filter_by(
+    Axis((0, 0, 0), extrude_dir)).group_by(Axis.Z)[0]
+assert len(
+    to_fillet) == 2, "Unexpected number of edges to fillet for stem (out-bottom)"
 stem_part = fillet(to_fillet, stem_fillet)
 del to_fillet
+del extrude_dir
 
 # Add joint
 RigidJoint("front", stem_part, Location(stem_part.faces().group_by(
@@ -172,7 +181,7 @@ del stem_screw_holes
 del stem_screw_holes_mirror
 
 # Final split
-RigidJoint("split_joint", stem_part, Location(stem_part.center() + (0, 0, 0.75*MM), stem_part.faces(
+RigidJoint("split_joint", stem_part, Location(stem_part.center() + (0, 0, 1), stem_part.faces(
 ).group_by(Axis.Z)[0].face().center_location.orientation))  # "Center" of screw hole
 bb = stem_part.bounding_box()
 cutout = Box(bb.size.X + tol, bb.size.Y + tol, screw_floating_cut)

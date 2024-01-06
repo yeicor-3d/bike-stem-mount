@@ -25,22 +25,10 @@ with BuildSketch(handlebar_side_loc) as handlebar_side:
     Rectangle(handlebar_size[0], handlebar_size[1],
               align=Align.MIN, rotation=-handlebar_rot)
 with BuildPart() as handlebar_side_conn:
-    conn_base = stem_side_faces.group_by(Axis.Y)[-1].face()
+    face = stem_side_faces.group_by(Axis.Y)[-1].face()
     del stem_side_faces
-    edge_left = conn_base.edges().group_by(SortBy.LENGTH)[-3].edge()
-    edge_bottom = conn_base.edges().group_by(SortBy.LENGTH)[-2].edge()
-    extra_vert_rectangle = edge_bottom@0 + (edge_left@1 - edge_left@0)
-    edge_right = Edge.make_line(edge_bottom@0, extra_vert_rectangle)
-    edge_top = Edge.make_line(extra_vert_rectangle, edge_left@1)
-    face = Face.make_from_wires(Wire.make_wire(
-        [edge_left, edge_top, edge_right, edge_bottom]))
-    face_loc = Location(edge_bottom@1)
-    del conn_base
-    del edge_top
-    del edge_right
-    del edge_left
-    del edge_bottom
-    del extra_vert_rectangle
+    face_loc = Location(face.edges().group_by(
+        SortBy.LENGTH)[-1].group_by(Axis.Z)[0].edge()@1)
     with BuildLine() as handlebar_side_conn_path:
         Spline(face_loc.position,
                handlebar_side_loc.position,
