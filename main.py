@@ -19,8 +19,8 @@ del headset_screw_part
 del stem_part
 del handle_bars_part
 
-assert len(assembly.solids()) == 2, \
-    "Bad assembly, expected 2 solids (got %d)" % len(assembly.solids())
+assert len(assembly.solids()) == 4, \
+    "Bad assembly, expected 4 solids (got %s)" % assembly.solids()
 
 if 'ocp_vscode' in locals():
     with suppress(Exception):

@@ -2,6 +2,7 @@
 from contextlib import suppress
 from typing import Union
 from build123d import *
+from math import *
 try:
     from global_params import *
 except ImportError:  # HACK...
@@ -21,16 +22,19 @@ class ScrewableCylinder(BasePartObject):
         screw_head_height: float = 5,  # M5
         nut_inscribed_diameter: float = 7,  # M5
         nut_height: float = 2.7,  # M5
+        round: bool = False,
         rotation: RotationLike = (0, 0, 0),
         align: Union[Align, tuple[Align, Align, Align]] = None,
         mode: Mode = Mode.ADD,
     ):
         with BuildPart() as part:
-            total_height = screw_length + screw_head_height + 2*tol
+            total_height = screw_length + screw_head_height
             max_hole_diameter = max(
-                screw_diameter, screw_head_diameter, nut_inscribed_diameter)
+                screw_diameter + 2*tol, screw_head_diameter + 2*tol, (nut_inscribed_diameter + 2*tol) / cos(radians(360/6/2)))
             # Core
-            Cylinder(max_hole_diameter/2 + wall + tol, total_height)
+            Cylinder(max_hole_diameter/2 + wall, total_height)
+            if round:
+                fillet(edges(), radius=wall)
             # Top hole
             with BuildSketch(faces() >> Axis.Z):
                 Circle(screw_head_diameter/2 + tol)

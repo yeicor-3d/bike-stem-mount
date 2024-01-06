@@ -84,8 +84,8 @@ stem_height = stem_dist * math.tan(math.radians(stem_angle))
 extrude_dir = Vector(stem_dist, 0, stem_height)
 face = (stem_part.faces() >> Axis.X).face()
 # NOTE: Backwards and unaligned due to eps (required non-coincident edge and axis)
-rev_axis = Axis(face.edges().group_by(Axis.Z)
-                [-1].edge().center()+(0, 0, eps), (0, 1, 0))
+rev_axis = Axis(face.edges().group_by(
+    Axis.Z)[-1].group_by(Axis.Y)[0].edge().center()+(0, 0, eps), (0, 1, 0))
 rev_to_align = revolve(profiles=face, axis=rev_axis, revolution_arc=stem_angle)
 del face
 rev_to_align = rev_to_align.rotate(rev_axis, -stem_angle)

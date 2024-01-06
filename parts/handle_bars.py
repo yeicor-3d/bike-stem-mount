@@ -4,9 +4,11 @@ from build123d import *
 try:
     from global_params import *
     from stem import stem_height, stem_side_faces
+    from screwable_cylinder import ScrewableCylinder
 except ImportError:  # HACK...
     from parts.global_params import *
     from parts.stem import stem_height, stem_side_faces
+    from parts.screwable_cylinder import ScrewableCylinder
 with suppress(ImportError):  # Optional
     import ocp_vscode
 
@@ -36,34 +38,84 @@ with BuildPart() as handlebar_side_conn:
                tangent_scalars=[.5, 1])
     sweep(sections=[handlebar_side.sketch, face],
           path=handlebar_side_conn_path, multisection=True)
+    del handlebar_side
     del face
     del face_loc
     del handlebar_side_conn_path
-    del handlebar_side_loc
+handlebar_side_conn = handlebar_side_conn.part
 
-save = handlebar_side_conn.faces().group_by(Axis.X)[-1].face().center_location
+handle_bar_top_loc = handlebar_side_conn.faces().group_by(
+    Axis.X)[-1].face().center_location
 with BuildPart() as handle_bar_core:
-    with BuildSketch(save):
+    with BuildSketch(handle_bar_top_loc):
         Rectangle(handlebar_size[1], handlebar_size[0],
                   rotation=-handlebar_rot)
-    revolve(axis=Axis(save.position - (0, 0, handlebar_rad +
-                                       handlebar_size[1]/2), (0, 1, 0)))
-    del save
-handlebar_side_conn.part += handle_bar_core.part
+    revolve(axis=Axis(handle_bar_top_loc.position - (0, 0, handlebar_rad +
+                                                     handlebar_size[1]/2), (0, 1, 0)))
+handle_bar_core = handle_bar_core.part
+
+# Make adapter for screwable cylinder to connect to the ring
+screwable_cylinder = ScrewableCylinder(rotation=(0, 180, 0))
+bb = screwable_cylinder.bounding_box()
+sc_box = Box(bb.size.X, bb.size.Y, bb.size.Z)
+handle_bar_face_cut = handle_bar_core.faces().group_by(SortBy.AREA)[-1].face()
+hbfc_com = handle_bar_face_cut.center(CenterOf.MASS)
+handle_bar_face_cut = handle_bar_face_cut.moved(
+    Location((-hbfc_com.X + handlebar_rad, -hbfc_com.Y, -hbfc_com.Z))) & sc_box
+# Push it in the X axis to touch the screwable cylinder's bounding box
+handle_bar_face_cut = handle_bar_face_cut.moved(Location(Vector(10, 0, 0)))
+handle_bar_face_cut = handle_bar_face_cut.moved(
+    Location(Vector(-handle_bar_face_cut.face().distance_to(sc_box), 0, 0)))
+print(handle_bar_face_cut.location)
+sc_face_cut = screwable_cylinder.faces().group_by(
+    SortBy.AREA)[-1].face() & sc_box.moved(Location((bb.size.X/2, 0, 0)))
+screw_part_adapter_add = loft([handle_bar_face_cut, sc_face_cut])
+assert screw_part_adapter_add.is_valid(), "Loft failed"
+# HACK: Loft doesn't match precisely, so we fuse it with extremely high tolerance
+screw_part_adapter = screwable_cylinder.fuse(screw_part_adapter_add, tol=0.1)
+del screwable_cylinder, sc_box, sc_face_cut, screw_part_adapter_add
+
+handle_bar_center = handle_bar_core.center()
+
+# Connect the adapter to the handlebar
+spa_bb = screw_part_adapter.bounding_box()
+screw_part_adapter = screw_part_adapter.located(handle_bar_face_cut.location.inverse(
+) * Location((-hbfc_com.X + handlebar_rad, -hbfc_com.Y, -hbfc_com.Z)).inverse())
+del handlebar_side_loc, handle_bar_top_loc, handle_bar_face_cut, hbfc_com
+# HACK: Loft doesn't match precisely, so we fuse it with extremely high tolerance
+handle_bar_core = handle_bar_core.fuse(screw_part_adapter, tol=0.1)
+
+# Connect the mirrored adapter, around the center of the handlebar
+screw_part_adapter_mirror = mirror(objects=screw_part_adapter,
+                                   about=Plane(Location(handle_bar_center) * Plane.YZ.location))
+handle_bar_core = handle_bar_core.fuse(screw_part_adapter_mirror, tol=0.1)
+del screw_part_adapter, screw_part_adapter_mirror
+assert len(handle_bar_core.solids()) == 1, "Expected 1 solid"
+
+# Add the finished handle bar to the crazy side conn curve
+handlebar_side_conn = handlebar_side_conn.fuse(handle_bar_core)
+assert len(handlebar_side_conn.solids()) == 1, "Expected 1 solid"
 del handle_bar_core
-del handlebar_side
+
+# Cut the handlebar side connector to fit the handlebar
+RigidJoint("split_joint", handlebar_side_conn, Location(
+    handle_bar_center + (0, 0, 1)))  # "Center" of screw hole
+del handle_bar_center
+bb = handlebar_side_conn.bounding_box()
+cutout = Box(bb.size.X + tol, bb.size.Y + tol, screw_floating_cut)
+RigidJoint("center", cutout, Location((0, 0, 0)))
+handlebar_side_conn.joints["split_joint"].connect_to(cutout.joints["center"])
+handlebar_side_conn = handlebar_side_conn.cut(cutout)
+del cutout
+assert len(handlebar_side_conn.solids()) == 2, "Expected 2 solids"
 
 # Join a mirrored version of the handlebar side
-with BuildPart() as handle_bars_part:
-    add(handlebar_side_conn)
-
-    add(mirror(objects=handlebar_side_conn.part))
-    del handlebar_side_conn
-
-handle_bars_part = handle_bars_part.part
+handle_bars_part = handlebar_side_conn
+handle_bars_part = handle_bars_part.fuse(
+    mirror(objects=handlebar_side_conn))
+del handlebar_side_conn
 
 if __name__ == "__main__":  # While developing this single part
     ocp_vscode.show_all()
-    # ocp_vscode.show(handlebar_side_conn_2, "handlebar_side_conn_2")
 
 # # %%
