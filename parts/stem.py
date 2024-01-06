@@ -165,9 +165,16 @@ with BuildPart() as stem_screw_holes:
     del sketch_loc
     del bb
     extrude(until=Until.NEXT, target=tmp)
-    del tmp
     # # HACK: To fix only half extrusion done due to contact between the two parts
     mirror(about=Plane.YZ)
+    del tmp
+    to_fillet = stem_screw_holes.faces().group_by(Axis.Z)[-1].edges()
+    to_fillet += stem_screw_holes.faces().group_by(Axis.Z)[0].edges()
+    to_fillet -= to_fillet.group_by(SortBy.LENGTH)[0]
+    to_fillet -= to_fillet.group_by(Axis.Y)[-1]
+    to_fillet -= to_fillet.group_by(SortBy.LENGTH)[-1]
+    fillet(to_fillet, radius=wall-tol)
+    del to_fillet
     RigidJoint("center", stem_screw_holes.part, Location(
         stem_screw_holes.faces().group_by(Axis.Y)[-1].face().center()))
     stem_part.joints["front"].connect_to(
@@ -180,9 +187,19 @@ stem_part += stem_screw_holes_mirror
 del stem_screw_holes
 del stem_screw_holes_mirror
 
+# Final fillet
+to_fillet = stem_part.faces().group_by(Axis.X)[-1].edges()
+stem_part = stem_part.fillet(radius=wall/2.01, edge_list=to_fillet)
+to_fillet = stem_part.edges().group_by(Axis.Z)[0].edge()
+to_fillet = stem_part.faces().filter_by(lambda f: f.center().X <
+                                        (to_fillet@0.5).X and to_fillet in f.edges())
+to_fillet = to_fillet.edges()
+stem_part = stem_part.fillet(radius=wall/2.01, edge_list=to_fillet)
+del to_fillet
+
 # Final split
-RigidJoint("split_joint", stem_part, Location(stem_part.center() + (0, 0, 1), stem_part.faces(
-).group_by(Axis.Z)[0].face().center_location.orientation))  # "Center" of screw hole
+RigidJoint("split_joint", stem_part, Location(stem_part.center() +
+           (0, 0, 1), (0, -stem_angle, 0)))  # "Center" of screw hole
 bb = stem_part.bounding_box()
 cutout = Box(bb.size.X + tol, bb.size.Y + tol, screw_floating_cut)
 RigidJoint("center", cutout, Location((0, 0, 0)))
@@ -193,5 +210,7 @@ del cutout
 if __name__ == "__main__":  # While developing this single part
     ocp_vscode.show_all(render_joints=True)
     # ocp_vscode.show(handlebar_side_conn_2, "handlebar_side_conn_2")
+
+# %%
 
 # %%

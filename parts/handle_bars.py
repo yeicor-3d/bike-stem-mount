@@ -44,12 +44,19 @@ with BuildPart() as handlebar_side_conn:
     del handlebar_side_conn_path
 handlebar_side_conn = handlebar_side_conn.part
 
+# Nice and clean filleting
+to_fillet = handlebar_side_conn.faces().group_by(Axis.Y)[1].edges()
+to_fillet += handlebar_side_conn.faces().group_by(Axis.Y)[-1].edges()
+to_fillet -= to_fillet.group_by(SortBy.LENGTH)[0]
+handlebar_side_conn = handlebar_side_conn.fillet(
+    radius=wall/2.05, edge_list=to_fillet)
+
 handle_bar_top_loc = handlebar_side_conn.faces().group_by(
     Axis.X)[-1].face().center_location
 with BuildPart() as handle_bar_core:
     with BuildSketch(handle_bar_top_loc):
-        Rectangle(handlebar_size[1], handlebar_size[0],
-                  rotation=-handlebar_rot)
+        RectangleRounded(handlebar_size[1], handlebar_size[0], handlebar_size[1]/2.01,
+                         rotation=-handlebar_rot)
     revolve(axis=Axis(handle_bar_top_loc.position - (0, 0, handlebar_rad +
                                                      handlebar_size[1]/2), (0, 1, 0)))
 handle_bar_core = handle_bar_core.part
@@ -66,14 +73,21 @@ handle_bar_face_cut = handle_bar_face_cut.moved(
 handle_bar_face_cut = handle_bar_face_cut.moved(Location(Vector(10, 0, 0)))
 handle_bar_face_cut = handle_bar_face_cut.moved(
     Location(Vector(-handle_bar_face_cut.face().distance_to(sc_box), 0, 0)))
-print(handle_bar_face_cut.location)
 sc_face_cut = screwable_cylinder.faces().group_by(
     SortBy.AREA)[-1].face() & sc_box.moved(Location((bb.size.X/2, 0, 0)))
 screw_part_adapter_add = loft([handle_bar_face_cut, sc_face_cut])
 assert screw_part_adapter_add.is_valid(), "Loft failed"
 # HACK: Loft doesn't match precisely, so we fuse it with extremely high tolerance
-screw_part_adapter = screwable_cylinder.fuse(screw_part_adapter_add, tol=0.1)
+screw_part_adapter = screwable_cylinder.fuse(
+    screw_part_adapter_add, tol=1.0).clean()
 del screwable_cylinder, sc_box, sc_face_cut, screw_part_adapter_add
+to_fillet = screw_part_adapter.faces().group_by(Axis.Z)[-1].edges()
+to_fillet += screw_part_adapter.faces().group_by(Axis.Z)[0].edges()
+to_fillet -= to_fillet.group_by(SortBy.LENGTH)[0]
+to_fillet -= to_fillet.group_by(SortBy.LENGTH)[-1]
+to_fillet -= to_fillet.group_by(Axis.X)[-1]
+screw_part_adapter = screw_part_adapter.fillet(wall-tol, to_fillet)
+del to_fillet
 
 handle_bar_center = handle_bar_core.center()
 
@@ -82,13 +96,13 @@ spa_bb = screw_part_adapter.bounding_box()
 screw_part_adapter = screw_part_adapter.located(handle_bar_face_cut.location.inverse(
 ) * Location((-hbfc_com.X + handlebar_rad, -hbfc_com.Y, -hbfc_com.Z)).inverse())
 del handlebar_side_loc, handle_bar_top_loc, handle_bar_face_cut, hbfc_com
-# HACK: Loft doesn't match precisely, so we fuse it with extremely high tolerance
-handle_bar_core = handle_bar_core.fuse(screw_part_adapter, tol=0.1)
+# HACK: Loft doesn't match precisely, so we fuse it
+handle_bar_core = handle_bar_core.fuse(screw_part_adapter)
 
 # Connect the mirrored adapter, around the center of the handlebar
 screw_part_adapter_mirror = mirror(objects=screw_part_adapter,
                                    about=Plane(Location(handle_bar_center) * Plane.YZ.location))
-handle_bar_core = handle_bar_core.fuse(screw_part_adapter_mirror, tol=0.1)
+handle_bar_core = handle_bar_core.fuse(screw_part_adapter_mirror)
 del screw_part_adapter, screw_part_adapter_mirror
 assert len(handle_bar_core.solids()) == 1, "Expected 1 solid"
 
