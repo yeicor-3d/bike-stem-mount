@@ -11,29 +11,16 @@ with suppress(ImportError):  # Optional
 
 # ================== MODELLING (ASSEMBLY) ==================
 
-headset_screw = deepcopy(headset_screw_part.part)
-stem = deepcopy(stem_part)
-handle_bars = deepcopy(handle_bars_part.part)
+with BuildPart() as assembly:
+    add(headset_screw_part)
+    add(stem_part)
+    add(handle_bars_part)
 del headset_screw_part
 del stem_part
 del handle_bars_part
-RigidJoint("joint", headset_screw, Location(
-    headset_screw.faces().group_by(Axis.X)[-1].face().center_location.position))
-stem_headset_joint_loc = stem.faces().group_by(Axis.X)[
-    0].face().center_location
-stem_headset_joint_loc.orientation = (
-    stem_headset_joint_loc.orientation.X, stem_headset_joint_loc.orientation.Y+90, stem_headset_joint_loc.orientation.Z)
-RigidJoint("joint", stem, stem_headset_joint_loc)
-del stem_headset_joint_loc
-headset_screw.joints["joint"].connect_to(stem.joints["joint"])
 
-assembly = headset_screw + stem + handle_bars
-del headset_screw
-del stem
-del handle_bars
-
-print("Assembly is valid: %s. Using solids: %s" %
-      (assembly.is_valid(), assembly.solids()))
+assert len(assembly.solids()) == 2, \
+    "Bad assembly, expected 2 solids (got %d)" % len(assembly.solids())
 
 if 'ocp_vscode' in locals():
     with suppress(Exception):

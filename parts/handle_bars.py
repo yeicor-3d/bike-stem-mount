@@ -72,6 +72,8 @@ with BuildPart() as handle_bars_part:
     add(mirror(objects=handlebar_side_conn.part))
     del handlebar_side_conn
 
+handle_bars_part = handle_bars_part.part
+
 if __name__ == "__main__":  # While developing this single part
     ocp_vscode.show_all()
     # ocp_vscode.show(handlebar_side_conn_2, "handlebar_side_conn_2")

@@ -70,5 +70,7 @@ with BuildPart() as headset_screw_part:
     fillet(to_fillet, wall)
     del to_fillet
 
+headset_screw_part = headset_screw_part.part
+
 if __name__ == "__main__":  # While developing this single part
     ocp_vscode.show_all()

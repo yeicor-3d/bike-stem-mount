@@ -142,43 +142,44 @@ del to_fillet
 # Add joint
 RigidJoint("front", stem_part, Location(stem_part.faces().group_by(
     Axis.Y)[0].face().center(), (0, -stem_angle, 0)))
+RigidJoint("back", stem_part, -Location(stem_part.faces().group_by(
+    Axis.Y)[-1].face().center(), (0, -stem_angle+180, 0)))
 
 # Screw holes and part splitting
 with BuildPart() as stem_screw_holes:
     tmp = ScrewableCylinder(rotation=(0, 180, 90))
-    tmp.joints["edge_center"].connect_to(stem_part.joints["front"])
     bb = tmp.bounding_box()
     sketch_loc = stem_part.location * \
         stem_part.joints["front"].relative_location * Plane.XZ.location
-    with BuildSketch(sketch_loc):
+    with BuildSketch(Plane.XZ * Location((0, 0, bb.min.Y))):
         Rectangle(bb.size.X, bb.size.Z)
     del sketch_loc
     del bb
     extrude(until=Until.NEXT, target=tmp)
     del tmp
-    # HACK: To fix only half extrusion done due to contact between the two parts
+    # # HACK: To fix only half extrusion done due to contact between the two parts
     mirror(about=Plane.YZ)
-
-# Mirrored join
+    RigidJoint("center", stem_screw_holes.part, Location(
+        stem_screw_holes.faces().group_by(Axis.Y)[-1].face().center()))
+    stem_part.joints["front"].connect_to(
+        stem_screw_holes.part.joints["center"])
+    stem_screw_holes_mirror = deepcopy(stem_screw_holes.part)
+    stem_part.joints["back"].connect_to(
+        stem_screw_holes_mirror.joints["center"])
 stem_part += stem_screw_holes.part
-tmp = mirror(objects=copy(stem_screw_holes.part))
+stem_part += stem_screw_holes_mirror
 del stem_screw_holes
-RigidJoint("back", stem_part, Location(
-    stem_part.faces().group_by(Axis.Y)[-1].face().center()))
-RigidJoint("edge_center", tmp, Location(tmp.faces().group_by(
-    SortBy.AREA)[-2].face().center()))
-tmp.joints["edge_center"].connect_to(stem_part.joints["back"])
-stem_part += tmp
-del tmp
+del stem_screw_holes_mirror
 
 # Final split
-RigidJoint("split_joint", stem_part, Location(
-    stem_part.center() + (0, 0, 0.75*MM)))  # "Center" of screw hole
+RigidJoint("split_joint", stem_part, Location(stem_part.center() + (0, 0, 0.75*MM), stem_part.faces(
+).group_by(Axis.Z)[0].face().center_location.orientation))  # "Center" of screw hole
 bb = stem_part.bounding_box()
 cutout = Box(bb.size.X + tol, bb.size.Y + tol, screw_floating_cut)
 RigidJoint("center", cutout, Location((0, 0, 0)))
-cutout.joints["center"].connect_to(stem_part.joints["split_joint"])
+stem_part.joints["split_joint"].connect_to(cutout.joints["center"])
 stem_part -= cutout
+del cutout
 
 if __name__ == "__main__":  # While developing this single part
     ocp_vscode.show_all(render_joints=True)
