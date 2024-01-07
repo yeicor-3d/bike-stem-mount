@@ -1,14 +1,8 @@
 # %%
-from contextlib import suppress
 from typing import Union
 from build123d import *
 from math import *
-try:
-    from global_params import *
-except ImportError:  # HACK...
-    from parts.global_params import *
-with suppress(ImportError):  # Optional
-    import ocp_vscode
+from bike_stem_mount.parts.global_params import *
 
 # ================== MODELLING ==================
 
@@ -53,5 +47,6 @@ class ScrewableCylinder(BasePartObject):
 
 
 if __name__ == "__main__":
+    import ocp_vscode
     part = ScrewableCylinder(rotation=(0, 0, 90))
     ocp_vscode.show_all(render_joints=True)

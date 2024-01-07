@@ -36,7 +36,7 @@ jobs:
 
       - uses: "Yeicor/cadquery-action@v3.1.0"
         with:
-          scripts: "main.py"
+          scripts: "bike_stem_mount/main.py"
           # formats: "STL|STEP|AMF|SVG|TJS|DXF|VRML|VTP|3MF|GLTF"
           # website: "."
           # website-screenshot: "true"

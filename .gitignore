@@ -1,3 +1,7 @@
 /venv/
 /.idea/
 /*.stl
+/*.egg-info
+/.ocp_vscode
+/.vscode
+__pycache__/

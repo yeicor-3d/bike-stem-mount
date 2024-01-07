@@ -1,31 +1,32 @@
 # %%
-from contextlib import suppress
+from dataclasses import dataclass
 from build123d import *
-try:
-    from global_params import *
-    from stem import stem_height, stem_side_faces
-    from screwable_cylinder import ScrewableCylinder
-except ImportError:  # HACK...
-    from parts.global_params import *
-    from parts.stem import stem_height, stem_side_faces
-    from parts.screwable_cylinder import ScrewableCylinder
-with suppress(ImportError):  # Optional
-    import ocp_vscode
+from bike_stem_mount.parts.global_params import *
+from bike_stem_mount.parts.stem import stem_height, stem_side_faces
+from bike_stem_mount.parts.screwable_cylinder import ScrewableCylinder
 
 # ================== PARAMETERS ==================
 
-handlebar_side_xy = (80, 25)  # (center, start)
-handlebar_size = (10, wall)  # (width, height)
-handlebar_rot = 5  # Rotation of the handlebar (degrees)
-handlebar_rad = 16  # Radius of the handlebar
+
+@dataclass
+class HandleBarParams:
+    offset_x_center: float = 80
+    offset_y_start: float = 25
+    width: float = 10
+    height: float = wall
+    rotation: float = 5
+    radius: float = 16
+
+
+params = HandleBarParams()
 
 # ================== MODELLING ==================
 
 handlebar_side_loc = Location(
-    (handlebar_side_xy[0], handlebar_side_xy[1], stem_height), (0, 90, 90))
+    (params.offset_x_center, params.offset_y_start, stem_height), (0, 90, 90))
 with BuildSketch(handlebar_side_loc) as handlebar_side:
-    Rectangle(handlebar_size[0], handlebar_size[1],
-              align=Align.MIN, rotation=-handlebar_rot)
+    Rectangle(params.width, params.height,
+              align=Align.MIN, rotation=-params.rotation)
 with BuildPart() as handlebar_side_conn:
     face = stem_side_faces.group_by(Axis.Y)[-1].face()
     del stem_side_faces
@@ -56,10 +57,10 @@ handle_bar_top_loc = handlebar_side_conn.faces().group_by(
     Axis.X)[-1].face().center_location
 with BuildPart() as handle_bar_core:
     with BuildSketch(handle_bar_top_loc):
-        RectangleRounded(handlebar_size[1], handlebar_size[0], handlebar_size[1]/2.01,
-                         rotation=-handlebar_rot)
-    revolve(axis=Axis(handle_bar_top_loc.position - (0, 0, handlebar_rad +
-                                                     handlebar_size[1]/2), (0, 1, 0)))
+        RectangleRounded(params.height, params.width, params.height/2.01,
+                         rotation=-params.rotation)
+    revolve(axis=Axis(handle_bar_top_loc.position - (0, 0, params.radius +
+                                                     params.height/2), (0, 1, 0)))
 handle_bar_core = handle_bar_core.part
 
 # Make adapter for screwable cylinder to connect to the ring
@@ -69,7 +70,7 @@ sc_box = Box(bb.size.X, bb.size.Y, bb.size.Z)
 handle_bar_face_cut = handle_bar_core.faces().group_by(SortBy.AREA)[-1].face()
 hbfc_com = handle_bar_face_cut.center(CenterOf.MASS)
 handle_bar_face_cut = handle_bar_face_cut.moved(
-    Location((-hbfc_com.X + handlebar_rad, -hbfc_com.Y, -hbfc_com.Z))) & sc_box
+    Location((-hbfc_com.X + params.radius, -hbfc_com.Y, -hbfc_com.Z))) & sc_box
 # Push it in the X axis to touch the screwable cylinder's bounding box
 handle_bar_face_cut = handle_bar_face_cut.moved(Location(Vector(10, 0, 0)))
 handle_bar_face_cut = handle_bar_face_cut.moved(
@@ -95,7 +96,7 @@ handle_bar_center = handle_bar_core.center()
 # Connect the adapter to the handlebar
 spa_bb = screw_part_adapter.bounding_box()
 screw_part_adapter = screw_part_adapter.located(handle_bar_face_cut.location.inverse(
-) * Location((-hbfc_com.X + handlebar_rad, -hbfc_com.Y, -hbfc_com.Z)).inverse())
+) * Location((-hbfc_com.X + params.radius, -hbfc_com.Y, -hbfc_com.Z)).inverse())
 del handlebar_side_loc, handle_bar_top_loc, handle_bar_face_cut, hbfc_com
 # HACK: Loft doesn't match precisely, so we fuse it
 handle_bar_core = handle_bar_core.fuse(screw_part_adapter)
@@ -131,6 +132,5 @@ handle_bars_part = handle_bars_part.fuse(
 del handlebar_side_conn
 
 if __name__ == "__main__":  # While developing this single part
+    import ocp_vscode
     ocp_vscode.show_all()
-
-# # %%

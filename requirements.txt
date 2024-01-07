@@ -1,1 +1,4 @@
 git+https://github.com/gumyr/build123d
+
+# HACK to avoid setting PYTHONPATH
+--editable .
