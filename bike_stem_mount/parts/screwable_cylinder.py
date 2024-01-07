@@ -16,6 +16,7 @@ class ScrewableCylinder(BasePartObject):
         screw_head_height: float = 5,  # M5
         nut_inscribed_diameter: float = 7,  # M5
         nut_height: float = 2.7,  # M5
+        wall_size: float = wall,
         round: bool = False,
         rotation: RotationLike = (0, 0, 0),
         align: Union[Align, tuple[Align, Align, Align]] = None,
@@ -26,9 +27,9 @@ class ScrewableCylinder(BasePartObject):
             max_hole_diameter = max(
                 screw_diameter + 2*tol, screw_head_diameter + 2*tol, (nut_inscribed_diameter + 2*tol) / cos(radians(360/6/2)))
             # Core
-            Cylinder(max_hole_diameter/2 + wall, total_height)
+            Cylinder(max_hole_diameter/2 + wall_size, total_height)
             if round:
-                fillet(edges(), radius=wall)
+                fillet(edges(), radius=wall_size)
             # Top hole
             with BuildSketch(faces() >> Axis.Z):
                 Circle(screw_head_diameter/2 + tol)
@@ -41,9 +42,6 @@ class ScrewableCylinder(BasePartObject):
                                tol, 6, major_radius=False)
             extrude(amount=-nut_height, mode=Mode.SUBTRACT)
         super().__init__(part=part.part, rotation=rotation, align=align, mode=mode)
-        # NOTE: Create the joint after applying alingment + rotation
-        RigidJoint("edge_center", self, Location((self.location * Location(part.edges().filter_by(
-            Axis.Z).group_by(SortBy.LENGTH)[-1].edge().center())).position))
 
 
 if __name__ == "__main__":

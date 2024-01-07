@@ -110,21 +110,6 @@ stem_part += bottom_extrusion.part
 del bottom_extrusion
 del bottom_close
 
-# Stem fillet
-to_fillet = stem_part.edges().filter_by(Axis((0, 0, 0), extrude_dir))
-to_fillet -= to_fillet.group_by(Axis.Y)[0]  # Remove out
-to_fillet -= to_fillet.group_by(Axis.Y)[-1]  # Remove out
-assert len(
-    to_fillet) == 4, "Unexpected number of edges to fillet for stem (in-only)"
-stem_part = fillet(to_fillet, p.fillet)
-to_fillet = stem_part.edges().filter_by(
-    Axis((0, 0, 0), extrude_dir)).group_by(Axis.Z)[0]
-assert len(
-    to_fillet) == 2, "Unexpected number of edges to fillet for stem (out-bottom)"
-stem_part = fillet(to_fillet, p.fillet)
-del to_fillet
-del extrude_dir
-
 # Add joint
 RigidJoint("front", stem_part, Location(stem_part.faces().group_by(
     Axis.Y)[0].face().center(), (0, -p.angle, 0)))
@@ -140,36 +125,73 @@ with BuildPart() as stem_screw_holes:
     with BuildSketch(Plane.XZ * Location((0, 0, bb.min.Y))):
         Rectangle(bb.size.X, bb.size.Z)
     del sketch_loc
-    del bb
     extrude(until=Until.NEXT, target=tmp)
     # # HACK: To fix only half extrusion done due to contact between the two parts
     mirror(about=Plane.YZ)
-    del tmp
-    to_fillet = stem_screw_holes.faces().group_by(Axis.Z)[-1].edges()
-    to_fillet += stem_screw_holes.faces().group_by(Axis.Z)[0].edges()
+    center_loc = faces().group_by(Axis.Y)[-1].face().center()
+    # Make TOP AND BOTTOM more 3D print friendly with inbuilt supports
+    for face in [faces().group_by(Axis.Z)[-1].face(), faces().group_by(Axis.Z)[0].face()]:
+        is_top = face.center().Z > 0
+        # - Part 1: extrude top to convert to incline
+        # Approx...
+        max_extrude = p.height / 2 + 1.5 + (0 if is_top else -p.fillet/2)
+        extrude(face, amount=max_extrude)
+        # - Part 2: Cut the top using a plane
+        tmp = vertices().group_by(
+            Axis.Z)[-1 if is_top else 0].group_by(Axis.Y)[-1].group_by(Axis.X)[-1].vertex().center()
+        tmp.Z = min(tmp.Z, max_extrude) if is_top else max(tmp.Z, -max_extrude)
+        offset_z = tmp.Z - (bb.max.Z if is_top else bb.min.Z)
+        offset_y = tmp.Y - bb.min.Y
+        cut_angle = math.degrees(math.atan2(offset_z, offset_y))
+        # print(f"Cut angle: {cut_angle}")
+        assert abs(cut_angle) > 40, "<50 degree overhangs required"
+        cut_plane = Plane(Location(tmp.center(), (cut_angle, 0, 0)))
+        split(bisect_by=cut_plane, keep=Keep.BOTTOM if is_top else Keep.TOP)
+        del face, cut_plane, tmp
+    del bb
+    # Fillet
+    to_fillet = stem_screw_holes.faces().group_by(Axis.Z)[0].edges()
+    to_fillet += stem_screw_holes.faces().group_by(Axis.Z)[-1].edges()
+    to_fillet -= to_fillet.group_by(SortBy.LENGTH)[0]
     to_fillet -= to_fillet.group_by(SortBy.LENGTH)[0]
     to_fillet -= to_fillet.group_by(Axis.Y)[-1]
     to_fillet -= to_fillet.group_by(SortBy.LENGTH)[-1]
-    fillet(to_fillet, radius=wall-tol)
+    fillet(to_fillet, radius=wall)
     del to_fillet
-    RigidJoint("center", stem_screw_holes.part, Location(
-        stem_screw_holes.faces().group_by(Axis.Y)[-1].face().center()))
-    stem_part.joints["front"].connect_to(
-        stem_screw_holes.part.joints["center"])
-    stem_screw_holes_mirror = deepcopy(stem_screw_holes.part)
-    stem_part.joints["back"].connect_to(
-        stem_screw_holes_mirror.joints["center"])
+RigidJoint("center", stem_screw_holes.part, Location(center_loc))
+del center_loc
+stem_part.joints["front"].connect_to(
+    stem_screw_holes.part.joints["center"])
+stem_screw_holes_mirror = deepcopy(stem_screw_holes.part)
+stem_part.joints["back"].connect_to(
+    stem_screw_holes_mirror.joints["center"])
 stem_part += stem_screw_holes.part
 stem_part += stem_screw_holes_mirror
 del stem_screw_holes
 del stem_screw_holes_mirror
 
-# # Final fillet
-to_fillet = stem_part.faces().group_by(Axis.X)[-1].edges()
-stem_part = stem_part.fillet(radius=wall/2.01, edge_list=to_fillet)
-to_fillet = stem_part.edges().group_by(Axis.Z)[0]
-stem_part = stem_part.fillet(radius=wall/2.01, edge_list=to_fillet)
+# Stem fillet
+to_fillet = stem_part.edges().filter_by(Axis((0, 0, 0), extrude_dir))
+to_fillet -= to_fillet.group_by(Axis.Y)[0]  # Remove out
+to_fillet -= to_fillet.group_by(Axis.Y)[-1]  # Remove out
+assert len(
+    to_fillet) == 4, "Unexpected number of edges to fillet for stem (in-only)"
+stem_part = fillet(to_fillet, p.fillet)
+to_fillet = stem_part.edges().filter_by(
+    Axis((0, 0, 0), extrude_dir)).group_by(Axis.Z)[0]
+assert len(
+    to_fillet) == 2, "Unexpected number of edges to fillet for stem (out-bottom)"
+# Not as necessary, and improves printability
+stem_part = fillet(to_fillet, p.fillet/2)
 del to_fillet
+del extrude_dir
+
+# # # Final fillet
+# to_fillet = stem_part.faces().group_by(Axis.X)[-1].edges()
+# stem_part = stem_part.fillet(radius=wall/2.01, edge_list=to_fillet)
+# to_fillet = stem_part.edges().group_by(Axis.Z)[0]
+# stem_part = stem_part.fillet(radius=wall/2.01, edge_list=to_fillet)
+# del to_fillet
 
 # Final split
 RigidJoint("split_joint", stem_part, Location(stem_part.center() +
