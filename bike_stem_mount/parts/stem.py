@@ -118,29 +118,33 @@ RigidJoint("back", stem_part, -Location(stem_part.faces().group_by(
 
 # Screw holes and part splitting
 with BuildPart() as stem_screw_holes:
-    tmp = ScrewableCylinder(rotation=(0, 180, 90))
-    bb = tmp.bounding_box()
+    cyl = ScrewableCylinder(rotation=(0, 180, 90))
+    bb = cyl.bounding_box()
     sketch_loc = stem_part.location * \
         stem_part.joints["front"].relative_location * Plane.XZ.location
     with BuildSketch(Plane.XZ * Location((0, 0, bb.min.Y))):
         Rectangle(bb.size.X, bb.size.Z)
     del sketch_loc
-    extrude(until=Until.NEXT, target=tmp)
+    extrude(until=Until.NEXT, target=cyl)
     # # HACK: To fix only half extrusion done due to contact between the two parts
     mirror(about=Plane.YZ)
     center_loc = faces().group_by(Axis.Y)[-1].face().center()
+    sav = bb.min
+    sav.Z += 5
     # Make TOP AND BOTTOM more 3D print friendly with inbuilt supports
     for face in [faces().group_by(Axis.Z)[-1].face(), faces().group_by(Axis.Z)[0].face()]:
         is_top = face.center().Z > 0
         # - Part 1: extrude top to convert to incline
-        # Approx...
-        max_extrude = p.height / 2 + 1.5 + (0 if is_top else -p.fillet/2)
+        max_extrude = p.height / 2 + wall + \
+            (0 if is_top else -p.fillet/2)  # Approx
         extrude(face, amount=max_extrude)
         # - Part 2: Cut the top using a plane
         tmp = vertices().group_by(
             Axis.Z)[-1 if is_top else 0].group_by(Axis.Y)[-1].group_by(Axis.X)[-1].vertex().center()
-        tmp.Z = min(tmp.Z, max_extrude) if is_top else max(tmp.Z, -max_extrude)
-        offset_z = tmp.Z - (bb.max.Z if is_top else bb.min.Z)
+        tmp.Z = max_extrude * (1 if is_top else -1)
+        offset_z = tmp.Z - \
+            ((bb.max.Z - cyl.nut_height)
+             if is_top else (bb.min.Z))
         offset_y = tmp.Y - bb.min.Y
         cut_angle = math.degrees(math.atan2(offset_z, offset_y))
         # print(f"Cut angle: {cut_angle}")
@@ -148,7 +152,7 @@ with BuildPart() as stem_screw_holes:
         cut_plane = Plane(Location(tmp.center(), (cut_angle, 0, 0)))
         split(bisect_by=cut_plane, keep=Keep.BOTTOM if is_top else Keep.TOP)
         del face, cut_plane, tmp
-    del bb
+    del bb, cyl
     # Fillet
     to_fillet = stem_screw_holes.faces().group_by(Axis.Z)[0].edges()
     to_fillet += stem_screw_holes.faces().group_by(Axis.Z)[-1].edges()
@@ -186,12 +190,12 @@ stem_part = fillet(to_fillet, p.fillet/2)
 del to_fillet
 del extrude_dir
 
-# # # Final fillet
-# to_fillet = stem_part.faces().group_by(Axis.X)[-1].edges()
-# stem_part = stem_part.fillet(radius=wall/2.01, edge_list=to_fillet)
-# to_fillet = stem_part.edges().group_by(Axis.Z)[0]
-# stem_part = stem_part.fillet(radius=wall/2.01, edge_list=to_fillet)
-# del to_fillet
+# # Final fillet
+to_fillet = stem_part.faces().group_by(Axis.X)[-1].edges()
+stem_part = stem_part.fillet(radius=wall/2.01, edge_list=to_fillet)
+to_fillet = stem_part.edges().group_by(Axis.Z)[0]
+stem_part = stem_part.fillet(radius=wall/2.01, edge_list=to_fillet)
+del to_fillet
 
 # Final split
 RigidJoint("split_joint", stem_part, Location(stem_part.center() +

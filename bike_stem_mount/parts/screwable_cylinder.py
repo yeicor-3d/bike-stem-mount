@@ -1,4 +1,5 @@
 # %%
+from dataclasses import dataclass
 from typing import Union
 from build123d import *
 from math import *
@@ -7,41 +8,44 @@ from bike_stem_mount.parts.global_params import *
 # ================== MODELLING ==================
 
 
+@dataclass
 class ScrewableCylinder(BasePartObject):
-    def __init__(
-        self,
-        screw_length: float = 8,
-        screw_diameter: float = 5,  # M5
-        screw_head_diameter: float = 8.5,  # M5
-        screw_head_height: float = 5,  # M5
-        nut_inscribed_diameter: float = 7,  # M5
-        nut_height: float = 2.7,  # M5
-        wall_size: float = wall,
-        round: bool = False,
-        rotation: RotationLike = (0, 0, 0),
-        align: Union[Align, tuple[Align, Align, Align]] = None,
-        mode: Mode = Mode.ADD,
-    ):
+    screw_length: float = 8
+    screw_diameter: float = 5  # M5
+    screw_head_diameter: float = 8.5  # M5
+    screw_head_height: float = 5  # M5
+    nut_inscribed_diameter: float = 7  # M5
+    nut_height: float = 2.7  # M5
+    wall_size: float = wall
+    round: bool = False
+    rotation: RotationLike = (0, 0, 0)
+    align: Union[Align, tuple[Align, Align, Align]] = None
+    mode: Mode = Mode.ADD
+
+    def __post_init__(self):
         with BuildPart() as part:
-            total_height = screw_length + screw_head_height
+            total_height = self.screw_length + self.screw_head_height
             max_hole_diameter = max(
-                screw_diameter + 2*tol, screw_head_diameter + 2*tol, (nut_inscribed_diameter + 2*tol) / cos(radians(360/6/2)))
+                self.screw_diameter + 2*tol, self.screw_head_diameter + 2*tol,
+                (self.nut_inscribed_diameter + 2*tol) / cos(radians(360/6/2)))
             # Core
-            Cylinder(max_hole_diameter/2 + wall_size, total_height)
-            if round:
-                fillet(edges(), radius=wall_size)
+            Cylinder(max_hole_diameter/2 + self.wall_size, total_height)
+            if self.round:
+                fillet(edges(), radius=self.wall_size)
             # Top hole
             with BuildSketch(faces() >> Axis.Z):
-                Circle(screw_head_diameter/2 + tol)
-            extrude(amount=-screw_head_height, mode=Mode.SUBTRACT)
+                Circle(self.screw_head_diameter/2 + tol)
+            extrude(amount=-self.screw_head_height, mode=Mode.SUBTRACT)
             # Screw hole
-            Cylinder(screw_diameter/2 + tol, screw_length, mode=Mode.SUBTRACT)
+            Cylinder(self.screw_diameter/2 + tol,
+                     self.screw_length, mode=Mode.SUBTRACT)
             # Nut hole
             with BuildSketch(faces() << Axis.Z):
-                RegularPolygon(nut_inscribed_diameter/2 +
+                RegularPolygon(self.nut_inscribed_diameter/2 +
                                tol, 6, major_radius=False)
-            extrude(amount=-nut_height, mode=Mode.SUBTRACT)
-        super().__init__(part=part.part, rotation=rotation, align=align, mode=mode)
+            extrude(amount=-self.nut_height, mode=Mode.SUBTRACT)
+        super().__init__(part=part.part, rotation=self.rotation,
+                         align=self.align, mode=self.mode)
 
 
 if __name__ == "__main__":
