@@ -10,12 +10,13 @@ from bike_stem_mount.parts.screwable_cylinder import ScrewableCylinder
 
 @dataclass
 class HandleBarParams:
-    offset_x_center: float = 80
-    offset_y_start: float = 25
     width: float = 10
     height: float = wall
     rotation: float = 5
     radius: float = 16
+    offset_x_center: float = stem_side_faces.group_by(
+        Axis.Y)[-1].vertices().group_by(Axis.X)[-1].vertex().X + 3 + radius
+    offset_y_start: float = 25
 
 
 p = HandleBarParams()

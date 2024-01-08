@@ -21,7 +21,7 @@ if len(assembly.solids()) != 4:
 if __name__ == "__main__":
     try:
         import ocp_vscode
-        ocp_vscode.show_all(render_joints=True)
+        ocp_vscode.show_all(measure_tools=True, render_joints=True)
     except ImportError:  # Optional
         pass
 

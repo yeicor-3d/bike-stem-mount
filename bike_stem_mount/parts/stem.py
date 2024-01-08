@@ -12,7 +12,7 @@ from bike_stem_mount.parts.screwable_cylinder import ScrewableCylinder
 
 @dataclass
 class StemParams:
-    angle: float = 5
+    angle: float = -9
     """Angle from the headset to the stem (ignoring right angle)"""
     range: tuple[float, float] = (20, 45)
     """Range of the stem walls (from the headset center)"""
@@ -62,18 +62,16 @@ extrude_dir = Vector(stem_dist, 0, stem_height)
 face = (stem_part.faces() >> Axis.X).face()
 # NOTE: Backwards and unaligned due to eps (required non-coincident edge and axis)
 rev_axis = Axis(face.edges().group_by(
-    Axis.Z)[-1].group_by(Axis.Y)[0].edge().center()+(0, 0, eps), (0, 1, 0))
-rev_to_align = revolve(profiles=face, axis=rev_axis, revolution_arc=p.angle)
-del face
-rev_to_align = rev_to_align.rotate(rev_axis, -p.angle)
-del rev_axis
+    Axis.Z)[0].group_by(Axis.Y)[0].edge().center()-(0, 0, eps), (0, 1, 0))
+rev_to_align = revolve(profiles=face, axis=rev_axis,
+                       revolution_arc=abs(p.angle))
+del face, rev_axis
 stem_part += rev_to_align
 del rev_to_align
 assert len(stem_part.solids()) == 1, "Expected 1 solid"
 to_extrude = stem_part.faces().group_by(Axis.X)[-2]  # Why -1?
 stem_part += extrude(to_extrude, amount=extrude_dir.length,
                      dir=extrude_dir.normalized())
-# del extrude_dir
 del stem_dist
 
 # This export is required for handle_bars.py
@@ -129,8 +127,6 @@ with BuildPart() as stem_screw_holes:
     # # HACK: To fix only half extrusion done due to contact between the two parts
     mirror(about=Plane.YZ)
     center_loc = faces().group_by(Axis.Y)[-1].face().center()
-    sav = bb.min
-    sav.Z += 5
     # Make TOP AND BOTTOM more 3D print friendly with inbuilt supports
     for face in [faces().group_by(Axis.Z)[-1].face(), faces().group_by(Axis.Z)[0].face()]:
         is_top = face.center().Z > 0
@@ -193,13 +189,11 @@ del extrude_dir
 # # Final fillet
 to_fillet = stem_part.faces().group_by(Axis.X)[-1].edges()
 stem_part = stem_part.fillet(radius=wall/2.01, edge_list=to_fillet)
-to_fillet = stem_part.edges().group_by(Axis.Z)[0]
-stem_part = stem_part.fillet(radius=wall/2.01, edge_list=to_fillet)
 del to_fillet
 
 # Final split
-RigidJoint("split_joint", stem_part, Location(stem_part.center() +
-           (0, 0, 1), (0, -p.angle, 0)))  # "Center" of screw hole
+RigidJoint("split_joint", stem_part, Location(
+    stem_part.center(), (0, -p.angle, 0)))
 bb = stem_part.bounding_box()
 cutout = Box(bb.size.X + tol, bb.size.Y + tol, screw_floating_cut)
 RigidJoint("center", cutout, Location((0, 0, 0)))
@@ -209,4 +203,5 @@ del cutout
 
 if __name__ == "__main__":  # While developing this single part
     import ocp_vscode
-    ocp_vscode.show_all(render_joints=True)
+    ocp_vscode.show_all(measure_tools=True, render_joints=True,
+                        reset_camera=ocp_vscode.Camera.CENTER)
