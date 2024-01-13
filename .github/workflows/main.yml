@@ -34,7 +34,7 @@ jobs:
 
       - run: "pip install -r requirements.txt"
 
-      - uses: "Yeicor/cadquery-action@v3.1.0"
+      - uses: "Yeicor/cadquery-action@v3.1.1"
         with:
           scripts: "bike_stem_mount/main.py"
           # formats: "STL|STEP|AMF|SVG|TJS|DXF|VRML|VTP|3MF|GLTF"
